@@ -44,7 +44,7 @@ impl Builtin {
                 } else if let CommandType::External(path) = cmd_type {
                     println!("{} is {}", parsed_args, path.display());
                 } else {
-                    println!("{}: command not found", parsed_args);
+                    println!("{}: not found", parsed_args);
                 }
                 false
             }
@@ -95,7 +95,7 @@ fn main() {
                     break;
                 }
             },
-            None => println!("{}: command not found", command)
+            None => println!("{}: not found", command)
         }
     }
 }
