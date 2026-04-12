@@ -2,14 +2,15 @@
 use std::io::{self, Write, BufRead};
 
 fn main() {
-    // TODO: Uncomment the code below to pass the first stage
-    print!("$ ");
-    io::stdout().flush().unwrap();
+    loop {
+        print!("$ ");
+        io::stdout().flush().unwrap();
 
-    let stdin = io::stdin();
-    let line = read_input().expect("Failed to read input");
-    let trimmed = line.trim();
-    print!("{}: command not found", trimmed);
+        let stdin = io::stdin();
+        let line = read_input().expect("Failed to read input");
+        let trimmed = line.trim();
+        print!("{}: command not found", trimmed);
+    }
 }
 
 fn read_input() -> Result<String, io::Error> {
