@@ -1,10 +1,18 @@
-#[allow(unused_imports)]
 use std::io::{self, Write, BufRead};
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 
 enum Builtin {
     Exit,
     Echo,
     Type
+}
+
+#[derive(PartialEq, Eq)]
+enum CommandType {
+    Builtin,
+    External(PathBuf),
+    NotFound
 }
 
 impl Builtin {
@@ -25,15 +33,50 @@ impl Builtin {
                 false
             },
             Builtin::Type => {
-                if Builtin::parse(args[0]).is_some() {
-                    println!("{} is a shell builtin", args[0]);
+                let Some(parsed_args) = args.first() else {
+                    println!("type: missing argument");
+                    return false
+                };
+                let cmd_type = resolve_command(parsed_args);
+
+                if cmd_type == CommandType::Builtin {
+                    println!("{} is a shell builtin", parsed_args);
+                } else if let CommandType::External(path) = cmd_type {
+                    println!("{} is {}", parsed_args, path.display());
                 } else {
-                    println!("{}: not found", args[0]);
+                    println!("{}: command not found", parsed_args);
                 }
                 false
             }
         }
     }
+}
+
+fn resolve_command(name: &str) -> CommandType {
+    if Builtin::parse(name).is_some() {
+        CommandType::Builtin
+    } else if let Some(path) = resolve_external(name) {
+        CommandType::External(path)
+    } else {
+        CommandType::NotFound
+    }
+}
+fn resolve_external(cmd: &str) -> Option<PathBuf> {
+    if cmd.is_empty() { return None }
+    let path_env = std::env::var_os("PATH");
+    let all_paths = std::env::split_paths(&path_env.unwrap_or_default()).collect::<Vec<_>>();
+    for path in all_paths {
+        let candidate = path.join(cmd);
+        if !candidate.is_file(){
+            continue
+        }
+        let meta = std::fs::metadata(&candidate).ok()?;
+        let mode = meta.permissions().mode();
+        if mode & 0o111 != 0 {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 fn main() {
