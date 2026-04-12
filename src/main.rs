@@ -9,7 +9,7 @@ fn main() {
         let stdin = io::stdin();
         let line = read_input().expect("Failed to read input");
         let trimmed = line.trim();
-        print!("{}: command not found", trimmed);
+        println!("{}: command not found", trimmed);
     }
 }
 
