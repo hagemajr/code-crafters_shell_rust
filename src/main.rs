@@ -1,22 +1,48 @@
 #[allow(unused_imports)]
 use std::io::{self, Write, BufRead};
 
+enum Builtin {
+    Exit,
+    Echo
+}
+
+impl Builtin {
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "exit" => Some(Builtin::Exit),
+            "echo" => Some(Builtin::Echo),
+            _ => None
+        }
+    }
+
+    fn run(&self, args: &[&str]) -> bool {
+        match self {
+            Builtin::Exit => true,
+            Builtin::Echo => {
+                println!("{}", args.join(" "));
+                false
+            }
+        }
+    }
+}
+
 fn main() {
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
 
-        let stdin = io::stdin();
         let line = read_input().expect("Failed to read input");
-        let trimmed = line.trim();
-        if trimmed == "exit" {
-            break;
-        }
-        else if trimmed.starts_with("echo ") {
-            println!("{}", &trimmed[5..]);
-        }
-        else {
-            println!("{}: command not found", trimmed);
+        let mut parts = line.trim().split_whitespace();
+        let command = parts.next().unwrap_or("");
+        let args: Vec<&str> = parts.collect();
+
+        match Builtin::parse(command) {
+            Some(builtin) => {
+                if builtin.run(&args) {
+                    break;
+                }
+            },
+            None => println!("{}: command not found", command)
         }
     }
 }
