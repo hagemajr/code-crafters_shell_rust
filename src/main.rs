@@ -3,7 +3,8 @@ use std::io::{self, Write, BufRead};
 
 enum Builtin {
     Exit,
-    Echo
+    Echo,
+    Type
 }
 
 impl Builtin {
@@ -11,6 +12,7 @@ impl Builtin {
         match name {
             "exit" => Some(Builtin::Exit),
             "echo" => Some(Builtin::Echo),
+            "type" => Some(Builtin::Type),
             _ => None
         }
     }
@@ -20,6 +22,14 @@ impl Builtin {
             Builtin::Exit => true,
             Builtin::Echo => {
                 println!("{}", args.join(" "));
+                false
+            },
+            Builtin::Type => {
+                if Builtin::parse(args[0]).is_some() {
+                    println!("{} is a shell builtin", args[0]);
+                } else {
+                    println!("{}: not found", args[0]);
+                }
                 false
             }
         }
