@@ -11,7 +11,11 @@ fn main() {
         let trimmed = line.trim();
         if trimmed == "exit" {
             break;
-        } else {
+        }
+        else if trimmed.starts_with("echo ") {
+            println!("{}", &trimmed[5..]);
+        }
+        else {
             println!("{}: command not found", trimmed);
         }
     }
