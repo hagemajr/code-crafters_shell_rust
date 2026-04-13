@@ -1,6 +1,7 @@
 use std::io::{self, Write, BufRead};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::os::unix::process::CommandExt;
 
 #[derive(PartialEq, Eq)]
 enum Builtin {
@@ -98,6 +99,7 @@ fn main() {
             }
             CommandType::External(path) => {
                 let _ = std::process::Command::new(path)
+                    .arg0(command)
                     .args(&args)
                     .status();
             }
