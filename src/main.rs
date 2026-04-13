@@ -2,6 +2,7 @@ use std::io::{self, Write, BufRead};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
+#[derive(PartialEq, Eq)]
 enum Builtin {
     Exit,
     Echo,
@@ -10,10 +11,11 @@ enum Builtin {
 
 #[derive(PartialEq, Eq)]
 enum CommandType {
-    Builtin,
+    Builtin(Builtin),
     External(PathBuf),
     NotFound
 }
+
 
 impl Builtin {
     fn parse(name: &str) -> Option<Self> {
@@ -37,14 +39,11 @@ impl Builtin {
                     println!("type: missing argument");
                     return false
                 };
-                let cmd_type = resolve_command(parsed_args);
 
-                if cmd_type == CommandType::Builtin {
-                    println!("{} is a shell builtin", parsed_args);
-                } else if let CommandType::External(path) = cmd_type {
-                    println!("{} is {}", parsed_args, path.display());
-                } else {
-                    println!("{}: not found", parsed_args);
+                match resolve_command(parsed_args) {
+                    CommandType::Builtin(_) => println!("{} is a shell builtin", parsed_args),
+                    CommandType::External(path) => println!("{} is {}", parsed_args, path.display()),
+                    CommandType::NotFound => println!("{}: not found", parsed_args),
                 }
                 false
             }
@@ -53,8 +52,8 @@ impl Builtin {
 }
 
 fn resolve_command(name: &str) -> CommandType {
-    if Builtin::parse(name).is_some() {
-        CommandType::Builtin
+    if let Some(builtin) = Builtin::parse(name) {
+        CommandType::Builtin(builtin)
     } else if let Some(path) = resolve_external(name) {
         CommandType::External(path)
     } else {
@@ -64,13 +63,13 @@ fn resolve_command(name: &str) -> CommandType {
 fn resolve_external(cmd: &str) -> Option<PathBuf> {
     if cmd.is_empty() { return None }
     let path_env = std::env::var_os("PATH");
-    let all_paths = std::env::split_paths(&path_env.unwrap_or_default()).collect::<Vec<_>>();
-    for path in all_paths {
+
+    for path in std::env::split_paths(&path_env.unwrap_or_default()) {
         let candidate = path.join(cmd);
         if !candidate.is_file(){
             continue
         }
-        let meta = std::fs::metadata(&candidate).ok()?;
+        let Ok(meta) = std::fs::metadata(&candidate) else { continue };
         let mode = meta.permissions().mode();
         if mode & 0o111 != 0 {
             return Some(candidate);
@@ -89,13 +88,20 @@ fn main() {
         let command = parts.next().unwrap_or("");
         let args: Vec<&str> = parts.collect();
 
-        match Builtin::parse(command) {
-            Some(builtin) => {
+        if command.is_empty() { continue; }
+
+        match resolve_command(command) {
+            CommandType::Builtin(builtin) => {
                 if builtin.run(&args) {
                     break;
                 }
-            },
-            None => println!("{}: not found", command)
+            }
+            CommandType::External(path) => {
+                let _ = std::process::Command::new(path)
+                    .args(&args)
+                    .status();
+            }
+            CommandType::NotFound => println!("{}: not found", command),
         }
     }
 }
