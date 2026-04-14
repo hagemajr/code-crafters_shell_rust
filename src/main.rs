@@ -34,94 +34,13 @@ impl Builtin {
 
     fn run(&self, args: &[&str]) -> bool {
         match self {
-            Builtin::Exit => true,
-            Builtin::Echo => {
-                println!("{}", args.join(" "));
-                false
-            },
-            Builtin::Type => {
-                let Some(parsed_args) = args.first() else {
-                    println!("type: missing argument");
-                    return false
-                };
-
-                match resolve_command(parsed_args) {
-                    CommandType::Builtin(_) => println!("{} is a shell builtin", parsed_args),
-                    CommandType::External(path) => println!("{} is {}", parsed_args, path.display()),
-                    CommandType::NotFound => println!("{}: not found", parsed_args),
-                }
-                false
-            },
-            Builtin::Pwd => {
-                match std::env::current_dir() {
-                    Ok(path) => println!("{}", path.display()),
-                    Err(err) => eprintln!("pwd: {}", err),
-                }
-                false
-            },
-            Builtin::Cd => {
-                let Some(dir) = args.first() else {
-                    eprintln!("cd: missing argument");
-                    return false;
-                };
-                if *dir == "~" {
-                    if let Some(home) = std::env::var_os("HOME") {
-                        if let Err(_) = std::env::set_current_dir(home) {
-                            eprintln!("cd: failed to change to home directory");
-                        }
-                        return false;
-                    } else {
-                        eprintln!("cd: HOME environment variable not set");
-                        return false;
-                    }
-                } else if dir.starts_with('~') {
-                    if let Some(home) = std::env::var_os("HOME") {
-                        let relative_path = &dir[2..];
-                        let full_path = PathBuf::from(home).join(relative_path);
-                        println!("Changing to {}", full_path.display());
-                        if let Err(_) = std::env::set_current_dir(full_path) {
-                            eprintln!("cd: {}: No such file or directory", dir);
-                        }
-                        return false;
-                    } else {
-                        eprintln!("cd: HOME environment variable not set");
-                        return false;
-                    }
-                }
-                if let Err(_) = std::env::set_current_dir(dir) {
-                    eprintln!("cd: {}: No such file or directory", dir);
-                }
-                false
-            }
+            Builtin::Exit => exit_command(),
+            Builtin::Echo => echo_command(args),
+            Builtin::Type => type_command(args),
+            Builtin::Pwd => pwd_command(),
+            Builtin::Cd => cd_command(args),
         }
     }
-}
-
-fn resolve_command(name: &str) -> CommandType {
-    if let Some(builtin) = Builtin::parse(name) {
-        CommandType::Builtin(builtin)
-    } else if let Some(path) = resolve_external(name) {
-        CommandType::External(path)
-    } else {
-        CommandType::NotFound
-    }
-}
-fn resolve_external(cmd: &str) -> Option<PathBuf> {
-    if cmd.is_empty() { return None }
-    let path_env = std::env::var_os("PATH");
-
-    for path in std::env::split_paths(&path_env.unwrap_or_default()) {
-        let candidate = path.join(cmd);
-        if !candidate.is_file(){
-            continue
-        }
-        let Ok(meta) = std::fs::metadata(&candidate) else { continue };
-        let mode = meta.permissions().mode();
-        if mode & 0o111 != 0 {
-            return Some(candidate);
-        }
-    }
-    None
 }
 
 fn main() {
@@ -157,4 +76,98 @@ fn read_input() -> Result<String, io::Error> {
     let mut line = String::new();
     io::stdin().lock().read_line(&mut line)?;
     Ok(line)
+}
+
+fn resolve_command(name: &str) -> CommandType {
+    if let Some(builtin) = Builtin::parse(name) {
+        CommandType::Builtin(builtin)
+    } else if let Some(path) = resolve_external(name) {
+        CommandType::External(path)
+    } else {
+        CommandType::NotFound
+    }
+}
+
+fn resolve_external(cmd: &str) -> Option<PathBuf> {
+    if cmd.is_empty() { return None }
+    let path_env = std::env::var_os("PATH");
+
+    for path in std::env::split_paths(&path_env.unwrap_or_default()) {
+        let candidate = path.join(cmd);
+        if !candidate.is_file(){
+            continue
+        }
+        let Ok(meta) = std::fs::metadata(&candidate) else { continue };
+        let mode = meta.permissions().mode();
+        if mode & 0o111 != 0 {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn exit_command() -> bool {
+    true
+}
+
+fn echo_command(args: &[&str]) -> bool {
+    println!("{}", args.join(" "));
+    false
+}
+
+fn type_command(args: &[&str]) -> bool {
+    let Some(parsed_args) = args.first() else {
+        println!("type: missing argument");
+        return false
+    };
+
+    match resolve_command(parsed_args) {
+        CommandType::Builtin(_) => println!("{} is a shell builtin", parsed_args),
+        CommandType::External(path) => println!("{} is {}", parsed_args, path.display()),
+        CommandType::NotFound => println!("{}: not found", parsed_args),
+    }
+    false
+}
+
+fn pwd_command() -> bool {
+    match std::env::current_dir() {
+        Ok(path) => println!("{}", path.display()),
+        Err(err) => eprintln!("pwd: {}", err),
+    }
+    false
+}
+
+fn cd_command(args: &[&str]) -> bool {
+    let Some(dir) = args.first() else {
+        eprintln!("cd: missing argument");
+        return false;
+    };
+    if *dir == "~" {
+        if let Some(home) = std::env::var_os("HOME") {
+            if let Err(_) = std::env::set_current_dir(home) {
+                eprintln!("cd: failed to change to home directory");
+            }
+            return false;
+        } else {
+            eprintln!("cd: HOME environment variable not set");
+            return false;
+        }
+    } else if dir.starts_with('~') {
+        if let Some(home) = std::env::var_os("HOME") {
+            let relative_path = &dir[2..];
+            let full_path = PathBuf::from(home).join(relative_path);
+            println!("Changing to {}", full_path.display());
+            if let Err(_) = std::env::set_current_dir(full_path) {
+                eprintln!("cd: {}: No such file or directory", dir);
+            }
+            return false;
+        } else {
+            eprintln!("cd: HOME environment variable not set");
+            return false;
+        }
+    }
+    if let Err(_) = std::env::set_current_dir(dir) {
+        eprintln!("cd: {}: No such file or directory", dir);
+    }
+    false
 }
