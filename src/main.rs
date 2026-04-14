@@ -65,7 +65,7 @@ impl Builtin {
                     return false;
                 };
                 if let Err(_) = std::env::set_current_dir(dir) {
-                    eprintln!("cd {}: No such file or directory", dir);
+                    eprintln!("cd: {}: No such file or directory", dir);
                 }
                 false
             }
