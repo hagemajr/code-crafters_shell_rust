@@ -64,6 +64,30 @@ impl Builtin {
                     eprintln!("cd: missing argument");
                     return false;
                 };
+                if *dir == "~" {
+                    if let Some(home) = std::env::var_os("HOME") {
+                        if let Err(_) = std::env::set_current_dir(home) {
+                            eprintln!("cd: failed to change to home directory");
+                        }
+                        return false;
+                    } else {
+                        eprintln!("cd: HOME environment variable not set");
+                        return false;
+                    }
+                } else if dir.starts_with('~') {
+                    if let Some(home) = std::env::var_os("HOME") {
+                        let relative_path = &dir[2..];
+                        let full_path = PathBuf::from(home).join(relative_path);
+                        println!("Changing to {}", full_path.display());
+                        if let Err(_) = std::env::set_current_dir(full_path) {
+                            eprintln!("cd: {}: No such file or directory", dir);
+                        }
+                        return false;
+                    } else {
+                        eprintln!("cd: HOME environment variable not set");
+                        return false;
+                    }
+                }
                 if let Err(_) = std::env::set_current_dir(dir) {
                     eprintln!("cd: {}: No such file or directory", dir);
                 }
