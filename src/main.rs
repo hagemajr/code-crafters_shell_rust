@@ -7,7 +7,8 @@ use std::os::unix::process::CommandExt;
 enum Builtin {
     Exit,
     Echo,
-    Type
+    Type,
+    Pwd
 }
 
 #[derive(PartialEq, Eq)]
@@ -24,6 +25,8 @@ impl Builtin {
             "exit" => Some(Builtin::Exit),
             "echo" => Some(Builtin::Echo),
             "type" => Some(Builtin::Type),
+            "pwd" => Some(Builtin::Pwd),
+
             _ => None
         }
     }
@@ -45,6 +48,13 @@ impl Builtin {
                     CommandType::Builtin(_) => println!("{} is a shell builtin", parsed_args),
                     CommandType::External(path) => println!("{} is {}", parsed_args, path.display()),
                     CommandType::NotFound => println!("{}: not found", parsed_args),
+                }
+                false
+            },
+            Builtin::Pwd => {
+                match std::env::current_dir() {
+                    Ok(path) => println!("{}", path.display()),
+                    Err(err) => eprintln!("pwd: {}", err),
                 }
                 false
             }
