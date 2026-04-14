@@ -8,7 +8,8 @@ enum Builtin {
     Exit,
     Echo,
     Type,
-    Pwd
+    Pwd,
+    Cd
 }
 
 #[derive(PartialEq, Eq)]
@@ -26,7 +27,7 @@ impl Builtin {
             "echo" => Some(Builtin::Echo),
             "type" => Some(Builtin::Type),
             "pwd" => Some(Builtin::Pwd),
-
+            "cd" => Some(Builtin::Cd),
             _ => None
         }
     }
@@ -55,6 +56,16 @@ impl Builtin {
                 match std::env::current_dir() {
                     Ok(path) => println!("{}", path.display()),
                     Err(err) => eprintln!("pwd: {}", err),
+                }
+                false
+            },
+            Builtin::Cd => {
+                let Some(dir) = args.first() else {
+                    eprintln!("cd: missing argument");
+                    return false;
+                };
+                if let Err(_) = std::env::set_current_dir(dir) {
+                    eprintln!("cd {}: No such file or directory", dir);
                 }
                 false
             }
