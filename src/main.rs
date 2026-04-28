@@ -1,7 +1,7 @@
-use std::io::{self, Write, BufRead};
+use std::io::{self, BufRead, Write};
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 
 #[derive(PartialEq, Eq)]
 enum Builtin {
@@ -9,16 +9,15 @@ enum Builtin {
     Echo,
     Type,
     Pwd,
-    Cd
+    Cd,
 }
 
 #[derive(PartialEq, Eq)]
 enum CommandType {
     Builtin(Builtin),
     External(PathBuf),
-    NotFound
+    NotFound,
 }
-
 
 impl Builtin {
     fn parse(name: &str) -> Option<Self> {
@@ -28,11 +27,11 @@ impl Builtin {
             "type" => Some(Builtin::Type),
             "pwd" => Some(Builtin::Pwd),
             "cd" => Some(Builtin::Cd),
-            _ => None
+            _ => None,
         }
     }
 
-    fn run(&self, args: &[&str]) -> bool {
+    fn run(&self, args: &[String]) -> bool {
         match self {
             Builtin::Exit => exit_command(),
             Builtin::Echo => echo_command(args),
@@ -49,22 +48,25 @@ fn main() {
         io::stdout().flush().unwrap();
 
         let line = read_input().expect("Failed to read input");
-        let mut parts = line.trim().split_whitespace();
-        let command = parts.next().unwrap_or("");
-        let args: Vec<&str> = parts.collect();
+        let mut parts = tokenize(line.trim());
+        let Some((command, args)) = parts.split_first() else {
+            continue;
+        };
 
-        if command.is_empty() { continue; }
+        if command.is_empty() {
+            continue;
+        }
 
         match resolve_command(command) {
             CommandType::Builtin(builtin) => {
-                if builtin.run(&args) {
+                if builtin.run(args) {
                     break;
                 }
             }
             CommandType::External(path) => {
                 let _ = std::process::Command::new(path)
                     .arg0(command)
-                    .args(&args)
+                    .args(args)
                     .status();
             }
             CommandType::NotFound => println!("{}: not found", command),
@@ -89,15 +91,19 @@ fn resolve_command(name: &str) -> CommandType {
 }
 
 fn resolve_external(cmd: &str) -> Option<PathBuf> {
-    if cmd.is_empty() { return None }
+    if cmd.is_empty() {
+        return None;
+    }
     let path_env = std::env::var_os("PATH");
 
     for path in std::env::split_paths(&path_env.unwrap_or_default()) {
         let candidate = path.join(cmd);
-        if !candidate.is_file(){
-            continue
+        if !candidate.is_file() {
+            continue;
         }
-        let Ok(meta) = std::fs::metadata(&candidate) else { continue };
+        let Ok(meta) = std::fs::metadata(&candidate) else {
+            continue;
+        };
         let mode = meta.permissions().mode();
         if mode & 0o111 != 0 {
             return Some(candidate);
@@ -110,15 +116,15 @@ fn exit_command() -> bool {
     true
 }
 
-fn echo_command(args: &[&str]) -> bool {
+fn echo_command(args: &[String]) -> bool {
     println!("{}", args.join(" "));
     false
 }
 
-fn type_command(args: &[&str]) -> bool {
+fn type_command(args: &[String]) -> bool {
     let Some(parsed_args) = args.first() else {
         println!("type: missing argument");
-        return false
+        return false;
     };
 
     match resolve_command(parsed_args) {
@@ -137,7 +143,7 @@ fn pwd_command() -> bool {
     false
 }
 
-fn cd_command(args: &[&str]) -> bool {
+fn cd_command(args: &[String]) -> bool {
     let Some(dir) = args.first() else {
         eprintln!("cd: missing argument");
         return false;
@@ -170,4 +176,28 @@ fn cd_command(args: &[&str]) -> bool {
         eprintln!("cd: {}: No such file or directory", dir);
     }
     false
+}
+
+fn tokenize(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_quote = false;
+
+    for c in input.chars() {
+        match (c, in_quote) {
+            ('\'', false) => in_quote = true,
+            ('\'', true) => in_quote = false,
+            (c, true) => current.push(c),
+            (c, false) if c.is_whitespace() => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            (c, false) => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
 }
