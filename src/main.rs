@@ -179,6 +179,7 @@ fn cd_command(args: &[String]) -> bool {
 }
 
 fn tokenize(input: &str) -> Vec<String> {
+    #[derive(Clone, Copy)]
     enum QuoteState {
         None,
         Single,
@@ -189,10 +190,18 @@ fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut state = QuoteState::None;
+    let mut prev_state = QuoteState::None;
 
     for c in input.chars() {
         match (c, &state) {
-            ('\\', QuoteState::None) => state = QuoteState::Backslash,
+            ('\\', QuoteState::None) => {
+                state = QuoteState::Backslash;
+                prev_state = QuoteState::None
+            }
+            ('\\', QuoteState::Double) => {
+                state = QuoteState::Backslash;
+                prev_state = QuoteState::Double
+            }
 
             ('\'', QuoteState::None) => state = QuoteState::Single,
             ('\'', QuoteState::Single) => state = QuoteState::None,
@@ -204,7 +213,7 @@ fn tokenize(input: &str) -> Vec<String> {
             (c, QuoteState::Double) => current.push(c),
             (c, QuoteState::Backslash) => {
                 current.push(c);
-                state = QuoteState::None
+                state = prev_state;
             }
             (c, QuoteState::None) if c.is_whitespace() => {
                 if !current.is_empty() {
