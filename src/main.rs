@@ -183,6 +183,7 @@ fn tokenize(input: &str) -> Vec<String> {
         None,
         Single,
         Double,
+        Backslash,
     }
 
     let mut tokens = Vec::new();
@@ -191,12 +192,20 @@ fn tokenize(input: &str) -> Vec<String> {
 
     for c in input.chars() {
         match (c, &state) {
+            ('\\', QuoteState::None) => state = QuoteState::Backslash,
+
             ('\'', QuoteState::None) => state = QuoteState::Single,
             ('\'', QuoteState::Single) => state = QuoteState::None,
+
             ('\"', QuoteState::None) => state = QuoteState::Double,
             ('\"', QuoteState::Double) => state = QuoteState::None,
+
             (c, QuoteState::Single) => current.push(c),
             (c, QuoteState::Double) => current.push(c),
+            (c, QuoteState::Backslash) => {
+                current.push(c);
+                state = QuoteState::None
+            }
             (c, QuoteState::None) if c.is_whitespace() => {
                 if !current.is_empty() {
                     tokens.push(std::mem::take(&mut current));
