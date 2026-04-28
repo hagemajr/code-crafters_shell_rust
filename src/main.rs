@@ -179,21 +179,30 @@ fn cd_command(args: &[String]) -> bool {
 }
 
 fn tokenize(input: &str) -> Vec<String> {
+    enum QuoteState {
+        None,
+        Single,
+        Double,
+    }
+
     let mut tokens = Vec::new();
     let mut current = String::new();
-    let mut in_quote = false;
+    let mut state = QuoteState::None;
 
     for c in input.chars() {
-        match (c, in_quote) {
-            ('\'', false) => in_quote = true,
-            ('\'', true) => in_quote = false,
-            (c, true) => current.push(c),
-            (c, false) if c.is_whitespace() => {
+        match (c, &state) {
+            ('\'', QuoteState::None) => state = QuoteState::Single,
+            ('\'', QuoteState::Single) => state = QuoteState::None,
+            ('\"', QuoteState::None) => state = QuoteState::Double,
+            ('\"', QuoteState::Double) => state = QuoteState::None,
+            (c, QuoteState::Single) => current.push(c),
+            (c, QuoteState::Double) => current.push(c),
+            (c, QuoteState::None) if c.is_whitespace() => {
                 if !current.is_empty() {
                     tokens.push(std::mem::take(&mut current));
                 }
             }
-            (c, false) => current.push(c),
+            (c, QuoteState::None) => current.push(c),
         }
     }
     if !current.is_empty() {
